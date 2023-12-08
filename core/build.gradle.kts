@@ -38,9 +38,6 @@ android {
 }
 
 dependencies {
-    implementation(Dependencies.AndroidX.core)
-    implementation(Dependencies.AndroidX.appCompat)
-    implementation(Dependencies.AndroidX.lifecycleViewmodel)
 
     //Dagger Hilt
     implementation(Dependencies.Hilt.hilt)
@@ -52,4 +49,7 @@ dependencies {
 
     //AndroidX
     implementation(Dependencies.AndroidX.activityCompose)
+    implementation(Dependencies.AndroidX.core)
+    implementation(Dependencies.AndroidX.appCompat)
+    implementation(Dependencies.AndroidX.lifecycleViewmodel)
 }
