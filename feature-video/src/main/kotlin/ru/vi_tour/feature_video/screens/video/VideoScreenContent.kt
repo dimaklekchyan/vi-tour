@@ -7,6 +7,7 @@ import androidx.camera.core.CameraSelector
 import androidx.camera.video.Quality
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -17,9 +18,11 @@ import ru.vi_tour.core.rememberPermissionController
 import ru.vi_tour.design_system.components.AppScaffold
 import ru.vi_tour.design_system.components.TransparentSystemBars
 import ru.vi_tour.design_system.dialogs.AppAlertDialog
+import ru.vi_tour.design_system.dialogs.AppDialog
 import ru.vi_tour.design_system.dialogs.LoadingIndicator
 import ru.vi_tour.design_system.dialogs.PermissionsRationaleDialog
 import ru.vi_tour.design_system.snackbars.AppSnackBarError
+import ru.vi_tour.design_system.theme.AppTheme
 import ru.vi_tour.feature_video.biz.VideoRecordStorageOptions
 import ru.vi_tour.feature_video.biz.VideoRecorder
 import ru.vi_tour.feature_video.ui_components.VideoCamera
@@ -88,6 +91,24 @@ internal fun VideoScreenContent(vm: VideoScreenViewModel) {
                 vm.obtainEvent(VideoScreenEvent.DismissUploading)
             }},
             onOutsideClick = {}
+        )
+    }
+
+    if (state.value.showSuccessfulDialog) {
+        AppAlertDialog(
+            title = "Отправка видео успешно завершена",
+            description = "",
+            confirmButtonText = "Ок",
+            dismissButtonText = "",
+            onConfirm = remember(vm) {{
+                vm.obtainEvent(VideoScreenEvent.HideSuccessfulDialog)
+            }},
+            onDismiss = remember(vm) {{
+                vm.obtainEvent(VideoScreenEvent.HideSuccessfulDialog)
+            }},
+            onOutsideClick = remember(vm) {{
+                vm.obtainEvent(VideoScreenEvent.HideSuccessfulDialog)
+            }}
         )
     }
 

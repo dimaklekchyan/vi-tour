@@ -47,11 +47,13 @@ fun AppAlertDialog(
             )
         },
         dismissButton = {
-            SecondaryButton(
-                buttonText = dismissButtonText,
-                enabled = true,
-                onClick = onDismiss
-            )
+            if (dismissButtonText.isNotEmpty()) {
+                SecondaryButton(
+                    buttonText = dismissButtonText,
+                    enabled = true,
+                    onClick = onDismiss
+                )
+            }
         }
     )
 }

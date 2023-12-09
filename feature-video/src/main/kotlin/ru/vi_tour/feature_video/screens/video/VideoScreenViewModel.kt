@@ -1,7 +1,6 @@
 package ru.vi_tour.feature_video.screens.video
 
 import android.net.Uri
-import android.util.Log
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
@@ -18,6 +17,7 @@ data class VideoScreenState(
     val permissionsGranted: Boolean = false,
     val showPermissionsRationale: Boolean = false,
     val showUploadingDialog: Boolean = false,
+    val showSuccessfulDialog: Boolean = false,
     val loading: Boolean = false,
     val sendingError: AppError? = null,
     val cameraConfig: CameraConfig = CameraConfig()
@@ -32,6 +32,7 @@ sealed class VideoScreenEvent {
     data object ConfirmUploading: VideoScreenEvent()
     data object DismissUploading: VideoScreenEvent()
     data object ClickOnSendingError: VideoScreenEvent()
+    data object HideSuccessfulDialog: VideoScreenEvent()
     class CameraConfigChanged(val config: CameraConfig): VideoScreenEvent()
 }
 
@@ -78,6 +79,9 @@ class VideoScreenViewModel @Inject constructor(
             is VideoScreenEvent.CameraConfigChanged -> {
                 viewState = viewState.copy(cameraConfig = viewEvent.config)
             }
+            is VideoScreenEvent.HideSuccessfulDialog -> {
+                viewState = viewState.copy(showSuccessfulDialog = false)
+            }
         }
     }
 
@@ -90,7 +94,7 @@ class VideoScreenViewModel @Inject constructor(
                 }
 
                 if (result.isSuccess()) {
-                    viewState = viewState.copy(loading = false, videoUri = null)
+                    viewState = viewState.copy(loading = false, videoUri = null, showSuccessfulDialog = true)
                 }
                 if (result.isError()) {
                     viewState = viewState.copy(loading = false, sendingError = result.error)

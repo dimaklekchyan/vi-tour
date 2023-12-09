@@ -4,10 +4,14 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.ContentValues
 import android.content.Context
+import android.hardware.Camera
+import android.hardware.camera2.CaptureRequest
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
 import android.util.Log
+import androidx.camera.camera2.impl.Camera2ImplConfig
+import androidx.camera.camera2.internal.Camera2CameraControlImpl
 import androidx.camera.core.CameraSelector
 import androidx.camera.video.FallbackStrategy
 import androidx.camera.video.FileOutputOptions
@@ -84,6 +88,7 @@ class VideoRecorder(
     var config: CameraConfig by mutableStateOf(CameraConfig())
         private set
 
+
     val controller = LifecycleCameraController(context).apply {
         setEnabledUseCases(CameraController.VIDEO_CAPTURE)
         videoCaptureQualitySelector = QualitySelector.from(
@@ -94,7 +99,7 @@ class VideoRecorder(
             .requireLensFacing(lens)
             .build()
 
-        cameraControl?.setLinearZoom(0f)
+
     }
 
     private val _isRecordingFlow = MutableStateFlow<Boolean>(false)
@@ -129,6 +134,8 @@ class VideoRecorder(
             return
         }
 
+        turnOnStabilization()
+        setMinimalZoom()
         updateConfig()
 
         when(storageOptions.storage) {
@@ -217,6 +224,25 @@ class VideoRecorder(
                 zoom = it.zoomState.value?.zoomRatio ?: 0f,
             )
         }
+    }
+
+    @SuppressLint("RestrictedApi")
+    private fun turnOnStabilization() {
+        val configBuilder = Camera2ImplConfig.Builder()
+        configBuilder.setCaptureRequestOption(
+            CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE,
+            CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE_OFF
+        )
+
+        configBuilder.setCaptureRequestOption(
+            CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE,
+            CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE_OFF
+        )
+        (controller.cameraControl as? Camera2CameraControlImpl)?.addInteropConfig(configBuilder.build())
+    }
+
+    private fun setMinimalZoom() {
+        controller.cameraControl?.setLinearZoom(0f)
     }
 
     companion object {
