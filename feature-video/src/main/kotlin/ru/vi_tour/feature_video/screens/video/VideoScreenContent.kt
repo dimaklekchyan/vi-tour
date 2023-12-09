@@ -2,10 +2,10 @@ package ru.vi_tour.feature_video.screens.video
 
 import android.annotation.SuppressLint
 import android.app.Activity
-import android.util.Log
 import android.widget.Toast
 import androidx.camera.core.CameraSelector
 import androidx.camera.video.Quality
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -17,10 +17,11 @@ import ru.vi_tour.core.rememberPermissionController
 import ru.vi_tour.design_system.components.AppScaffold
 import ru.vi_tour.design_system.components.TransparentSystemBars
 import ru.vi_tour.design_system.dialogs.AppAlertDialog
+import ru.vi_tour.design_system.dialogs.LoadingIndicator
 import ru.vi_tour.design_system.dialogs.PermissionsRationaleDialog
+import ru.vi_tour.design_system.snackbars.AppSnackBarError
 import ru.vi_tour.feature_video.biz.VideoRecordStorageOptions
 import ru.vi_tour.feature_video.biz.VideoRecorder
-import ru.vi_tour.feature_video.biz.VideoStorage
 import ru.vi_tour.feature_video.ui_components.VideoCamera
 
 @SuppressLint("MissingPermission")
@@ -86,34 +87,49 @@ internal fun VideoScreenContent(vm: VideoScreenViewModel) {
             onDismiss = remember(vm) {{
                 vm.obtainEvent(VideoScreenEvent.DismissUploading)
             }},
-            onOutsideClick = remember(vm) {{
-                vm.obtainEvent(VideoScreenEvent.DismissUploading)
-            }}
+            onOutsideClick = {}
         )
+    }
+
+    if (state.value.loading) {
+        LoadingIndicator()
     }
 
     AppScaffold(
         modifier = Modifier.fillMaxSize(),
         backgroundColor = Color.Black
     ) {
-        if (state.value.permissionsGranted) {
-            VideoCamera(
-                modifier = Modifier,
-                storageOptions = VideoRecordStorageOptions
-                    .getDefault(context)
-                    .copy(storage = VideoRecordStorageOptions.Storage.External),
-                availableQualities = arrayOf(Quality.HIGHEST),
-                availableLenses = arrayOf(CameraSelector.LENS_FACING_BACK),
-                onSuccess = remember {{ uri ->
-                    VideoStorage.getVideoByUri(uri, context)?.let { video ->
-                        vm.obtainEvent(VideoScreenEvent.VideoRecorder(video))
-                    }
-                }},
-                onError = {
-                    Log.d("TAG2", "error: ${it?.cause} ${it?.message}")
-                    Toast.makeText(context, "Произошла ошибка", Toast.LENGTH_SHORT).show()
-                }
-            )
+        Box(modifier = Modifier.fillMaxSize()) {
+            if (state.value.permissionsGranted) {
+                VideoCamera(
+                    modifier = Modifier,
+                    storageOptions = VideoRecordStorageOptions
+                        .getDefault(context)
+                        .copy(
+                            storage = VideoRecordStorageOptions.Storage.Internal,
+                            outputName = "vi_tour_${VideoRecordStorageOptions.date}"
+                        ),
+                    availableQualities = arrayOf(Quality.HIGHEST),
+                    availableLenses = arrayOf(CameraSelector.LENS_FACING_BACK),
+                    onSuccess = remember {{ uri ->
+                        vm.obtainEvent(VideoScreenEvent.VideoRecorder(uri))
+                    }},
+                    onError = {
+                        Toast.makeText(context, "Произошла ошибка", Toast.LENGTH_SHORT).show()
+                    },
+                    onConfigChanged = remember {{ config ->
+                        vm.obtainEvent(VideoScreenEvent.CameraConfigChanged(config))
+                    }},
+                )
+            }
+            if (state.value.sendingError != null) {
+                AppSnackBarError(
+                    message = state.value.sendingError?.message(),
+                    onErrorClick = remember(vm) {{
+                        vm.obtainEvent(VideoScreenEvent.ClickOnSendingError)
+                    }}
+                )
+            }
         }
     }
 }

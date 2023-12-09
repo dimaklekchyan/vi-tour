@@ -7,6 +7,7 @@ import android.content.Context
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
+import android.util.Log
 import androidx.camera.core.CameraSelector
 import androidx.camera.video.FallbackStrategy
 import androidx.camera.video.FileOutputOptions
@@ -28,6 +29,7 @@ import androidx.core.content.ContextCompat
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import ru.vi_tour.core.getAppName
+import ru.vi_tour.data_video.domain.model.CameraConfig
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -53,9 +55,11 @@ data class VideoRecordStorageOptions(
     }
 
     companion object {
+        val date: String
+            get() = SimpleDateFormat("dd_MM_yyyy_HH_mm_ss", Locale.getDefault())
+            .format(System.currentTimeMillis())
+
         fun getDefault(context: Context): VideoRecordStorageOptions {
-            val date = SimpleDateFormat("dd_MM_yyyy_HH_mm_ss", Locale.getDefault())
-                .format(System.currentTimeMillis())
             return VideoRecordStorageOptions(
                 storage = Storage.Internal,
                 outputName = "${context.getAppName()}_$date",
@@ -70,12 +74,14 @@ class VideoRecorder(
     private val storageOptions: VideoRecordStorageOptions,
     private val onProgress: (timeStr: String, seconds: Int) -> Unit = { _, _ -> },
     private val onSuccess: (Uri) -> Unit = {},
-    private val onError: (e: Throwable?) -> Unit = {}
+    private val onError: (e: Throwable?) -> Unit = {},
 ) {
 
     var quality by mutableStateOf<Quality>(Quality.HIGHEST)
         private set
     var lens by mutableStateOf<Int>(CameraSelector.LENS_FACING_BACK)
+        private set
+    var config: CameraConfig by mutableStateOf(CameraConfig())
         private set
 
     val controller = LifecycleCameraController(context).apply {
@@ -87,6 +93,8 @@ class VideoRecorder(
         cameraSelector = CameraSelector.Builder()
             .requireLensFacing(lens)
             .build()
+
+        cameraControl?.setLinearZoom(0f)
     }
 
     private val _isRecordingFlow = MutableStateFlow<Boolean>(false)
@@ -120,6 +128,8 @@ class VideoRecorder(
             stop()
             return
         }
+
+        updateConfig()
 
         when(storageOptions.storage) {
             VideoRecordStorageOptions.Storage.Internal -> {
@@ -196,6 +206,19 @@ class VideoRecorder(
         return FileOutputOptions.Builder(outputFile).build()
     }
 
+    private fun updateConfig() {
+        controller.cameraInfo?.let {
+            val resolution = QualitySelector.getResolution(it, quality)
+            config = config.copy(
+                lens = lens.name(),
+                quality = quality.name(),
+                resolutionHeight = resolution?.height ?: 0,
+                resolutionWidth = resolution?.width ?: 0,
+                zoom = it.zoomState.value?.zoomRatio ?: 0f,
+            )
+        }
+    }
+
     companion object {
         val PERMISSION = Manifest.permission.CAMERA
 
@@ -239,7 +262,7 @@ fun rememberVideoRecorder(
     storageOptions: VideoRecordStorageOptions = VideoRecordStorageOptions.getDefault(LocalContext.current),
     onProgress: (timeStr: String, seconds: Int) -> Unit = { _, _ -> },
     onSuccess: (Uri) -> Unit = {},
-    onError: (e: Throwable?) -> Unit = {}
+    onError: (e: Throwable?) -> Unit = {},
 ): VideoRecorder {
     val context = LocalContext.current
     return remember { VideoRecorder(context, storageOptions, onProgress, onSuccess, onError) }

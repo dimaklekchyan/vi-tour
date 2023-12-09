@@ -1,6 +1,7 @@
 plugins {
     id("com.android.library")
     id("dagger.hilt.android.plugin")
+    kotlin("plugin.serialization")
     kotlin("android")
     kotlin("kapt")
 }
@@ -51,6 +52,9 @@ dependencies {
     //Kotlin
     implementation(Dependencies.Kotlin.coroutines)
     implementation(Dependencies.Kotlin.serialization)
+
+    //Retrofit
+    implementation(Dependencies.Retrofit.retrofit)
 
     //AndroidX
     implementation(Dependencies.AndroidX.preference)

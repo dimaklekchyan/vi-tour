@@ -56,6 +56,7 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import ru.vi_tour.data_video.domain.model.CameraConfig
 import ru.vi_tour.design_system.theme.colorBlack
 import ru.vi_tour.design_system.theme.colorGreen
 import ru.vi_tour.design_system.theme.colorRed
@@ -75,7 +76,8 @@ internal fun VideoCamera(
     availableQualities: Array<Quality> = VideoRecorder.QUALITIES,
     availableLenses: Array<Int> = VideoRecorder.LENSES,
     onSuccess: (Uri) -> Unit = {},
-    onError: (e: Throwable?) -> Unit = {}
+    onError: (e: Throwable?) -> Unit = {},
+    onConfigChanged: (config: CameraConfig) -> Unit = {},
 ) {
 
     var progress by remember { mutableStateOf("") }
@@ -99,6 +101,10 @@ internal fun VideoCamera(
 
     DisposableEffect(key1 = Unit) {
         onDispose { videoRecorder.stop() }
+    }
+
+    LaunchedEffect(key1 = videoRecorder.config) {
+        onConfigChanged(videoRecorder.config)
     }
     
     Box(

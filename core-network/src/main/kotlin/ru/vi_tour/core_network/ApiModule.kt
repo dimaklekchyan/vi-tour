@@ -1,13 +1,17 @@
 package ru.vi_tour.core_network
 
+import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import kotlinx.serialization.ExperimentalSerializationApi
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import ru.vi_tour.core.AppConfig
+import ru.vi_tour.core.AppJsonConfiguration
 import java.util.concurrent.TimeUnit
 import javax.inject.Singleton
 
@@ -31,13 +35,18 @@ object ApiModule {
             .build()
     }
 
+    @OptIn(ExperimentalSerializationApi::class)
     @Provides
     @Singleton
     fun provideRetrofitClient(client: OkHttpClient): Retrofit {
+
+        val converterFactory = AppJsonConfiguration.json
+            .asConverterFactory("application/json".toMediaType())
+
         return Retrofit.Builder()
             .baseUrl(AppConfig.Api.baseUrl)
             .client(client)
-            .addConverterFactory(AppJsonConfiguration.converterFactory)
+            .addConverterFactory(converterFactory)
             .build()
     }
 }

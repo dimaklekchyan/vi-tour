@@ -1,16 +1,26 @@
 package ru.vi_tour.feature_video.screens.video
 
+import android.net.Uri
+import android.util.Log
+import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import ru.vi_tour.core.AppError
 import ru.vi_tour.core.BaseViewModel
-import ru.vi_tour.data_video.domain.model.Video
+import ru.vi_tour.data_video.domain.model.CameraConfig
+import ru.vi_tour.data_video.domain.repository.IVideoRepository
 import javax.inject.Inject
 
 data class VideoScreenState(
-    val video: Video? = null,
+    val videoUri: Uri? = null,
     val permissionsGranted: Boolean = false,
     val showPermissionsRationale: Boolean = false,
     val showUploadingDialog: Boolean = false,
-    val loading: Boolean = false
+    val loading: Boolean = false,
+    val sendingError: AppError? = null,
+    val cameraConfig: CameraConfig = CameraConfig()
 )
 
 sealed class VideoScreenEvent {
@@ -18,9 +28,11 @@ sealed class VideoScreenEvent {
     data object PermissionsGranted: VideoScreenEvent()
     data object ShowPermissionsRationale: VideoScreenEvent()
     data object HidePermissionsRationale: VideoScreenEvent()
-    class VideoRecorder(val video: Video): VideoScreenEvent()
+    class VideoRecorder(val videoUri: Uri): VideoScreenEvent()
     data object ConfirmUploading: VideoScreenEvent()
     data object DismissUploading: VideoScreenEvent()
+    data object ClickOnSendingError: VideoScreenEvent()
+    class CameraConfigChanged(val config: CameraConfig): VideoScreenEvent()
 }
 
 sealed class VideoScreenAction {
@@ -29,7 +41,7 @@ sealed class VideoScreenAction {
 
 @HiltViewModel
 class VideoScreenViewModel @Inject constructor(
-
+    private val repository: IVideoRepository
 ): BaseViewModel<VideoScreenState, VideoScreenAction, VideoScreenEvent>(
     initialState = VideoScreenState()
 ) {
@@ -49,28 +61,50 @@ class VideoScreenViewModel @Inject constructor(
                 viewState = viewState.copy(showPermissionsRationale = false)
             }
             is VideoScreenEvent.VideoRecorder -> {
-                viewState = viewState.copy(video = viewEvent.video, showUploadingDialog = true)
+                viewState = viewState.copy(videoUri = viewEvent.videoUri, showUploadingDialog = true)
             }
             is VideoScreenEvent.ConfirmUploading -> {
-                viewState = viewState.copy(video = null, showUploadingDialog = false)
+                viewState = viewState.copy(showUploadingDialog = false)
                 sendVideo()
             }
             is VideoScreenEvent.DismissUploading -> {
-                viewState = viewState.copy(video = null, showUploadingDialog = false)
+                viewState = viewState.copy(showUploadingDialog = false)
                 deleteVideo()
+            }
+            is VideoScreenEvent.ClickOnSendingError -> {
+                viewState = viewState.copy(sendingError = null)
+                sendVideo()
+            }
+            is VideoScreenEvent.CameraConfigChanged -> {
+                viewState = viewState.copy(cameraConfig = viewEvent.config)
             }
         }
     }
 
     private fun sendVideo() {
-        viewState.video?.let {
-            //TODO send video
+        viewState.videoUri?.let {
+            viewModelScope.launch {
+                viewState = viewState.copy(loading = true)
+                val result = withContext(Dispatchers.IO) {
+                    repository.uploadVideo(it, viewState.cameraConfig)
+                }
+
+                if (result.isSuccess()) {
+                    viewState = viewState.copy(loading = false, videoUri = null)
+                }
+                if (result.isError()) {
+                    viewState = viewState.copy(loading = false, sendingError = result.error)
+                }
+            }
         }
     }
 
     private fun deleteVideo() {
-        viewState.video?.let {
-            //TODO delete video
+        viewState.videoUri?.let { uri ->
+            viewModelScope.launch {
+                repository.deleteVideo(uri)
+                viewState = viewState.copy(videoUri = null)
+            }
         }
     }
 }

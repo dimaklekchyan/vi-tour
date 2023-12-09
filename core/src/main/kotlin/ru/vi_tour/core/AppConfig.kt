@@ -6,7 +6,7 @@ object AppConfig {
     }
 
     object Api {
-        private const val prodUrl = "https://vi-tour.ru/cabinet/api/v1/video/add/"
+        private const val prodUrl = "https://vi-tour.ru/api/v1/"
         private const val debugUrl = ""
 
         val baseUrl = if(Test.useDebugUrl) debugUrl else prodUrl

@@ -47,6 +47,9 @@ dependencies {
     implementation(platform(Dependencies.Compose.bom))
     implementation(Dependencies.Compose.runtime)
 
+    //Kotlin
+    implementation(Dependencies.Kotlin.serialization)
+
     //AndroidX
     implementation(Dependencies.AndroidX.activityCompose)
     implementation(Dependencies.AndroidX.core)
