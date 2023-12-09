@@ -19,7 +19,10 @@ import androidx.camera.view.CameraController
 import androidx.camera.view.LifecycleCameraController
 import androidx.camera.view.video.AudioConfig
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -70,9 +73,20 @@ class VideoRecorder(
     private val onError: (e: Throwable?) -> Unit = {}
 ) {
 
+    var quality by mutableStateOf<Quality>(Quality.HIGHEST)
+        private set
+    var lens by mutableStateOf<Int>(CameraSelector.LENS_FACING_BACK)
+        private set
+
     val controller = LifecycleCameraController(context).apply {
         setEnabledUseCases(CameraController.VIDEO_CAPTURE)
-        cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
+        videoCaptureQualitySelector = QualitySelector.from(
+            quality,
+            FallbackStrategy.higherQualityOrLowerThan(Quality.FHD)
+        )
+        cameraSelector = CameraSelector.Builder()
+            .requireLensFacing(lens)
+            .build()
     }
 
     private val _isRecordingFlow = MutableStateFlow<Boolean>(false)
@@ -85,19 +99,26 @@ class VideoRecorder(
         recording = null
     }
 
+    fun setNewQuality(quality: Quality) {
+        this.quality = quality
+        controller.videoCaptureQualitySelector = QualitySelector.from(
+            this.quality,
+            FallbackStrategy.higherQualityOrLowerThan(Quality.FHD)
+        )
+    }
+    fun setNewLens(lensFacing: Int) {
+        this.lens = lensFacing
+        controller.cameraSelector = CameraSelector.Builder()
+            .requireLensFacing(this.lens)
+            .build()
+    }
+
     @SuppressLint("MissingPermission")
-    fun recordVideo(quality: Quality) {
+    fun recordVideo() {
         if(recording != null) {
             stop()
             return
         }
-
-        controller.videoCaptureQualitySelector = QualitySelector.from(
-            quality,
-            FallbackStrategy.higherQualityOrLowerThan(Quality.FHD)
-        )
-
-        //TODO use wide angel camera
 
         when(storageOptions.storage) {
             VideoRecordStorageOptions.Storage.Internal -> {
@@ -186,7 +207,14 @@ class VideoRecorder(
             Quality.SD,
             Quality.HD,
             Quality.FHD,
-            Quality.UHD
+            Quality.UHD,
+            Quality.HIGHEST,
+            Quality.LOWEST
+        )
+        val LENSES = arrayOf(
+            CameraSelector.LENS_FACING_BACK,
+            CameraSelector.LENS_FACING_FRONT,
+            CameraSelector.LENS_FACING_UNKNOWN
         )
     }
 }
@@ -196,7 +224,16 @@ internal fun Quality.name() = when(this) {
     Quality.HD -> "HD"
     Quality.FHD -> "FHD"
     Quality.UHD -> "UHD"
+    Quality.HIGHEST -> "Highest"
+    Quality.LOWEST -> "Lowest"
     else -> throw IllegalArgumentException("$this is unsupported quality type")
+}
+
+internal fun Int.name() = when(this) {
+    CameraSelector.LENS_FACING_BACK -> "Back"
+    CameraSelector.LENS_FACING_FRONT -> "Front"
+    CameraSelector.LENS_FACING_UNKNOWN -> "Unknown"
+    else -> throw IllegalArgumentException("$this is unsupported lens type")
 }
 
 @Composable

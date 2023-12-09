@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -31,6 +32,7 @@ import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -39,13 +41,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import kotlinx.coroutines.delay
 import ru.vi_tour.design_system.theme.colorBlack
+import ru.vi_tour.design_system.theme.colorGreen
+import ru.vi_tour.design_system.theme.colorRed
+import ru.vi_tour.design_system.theme.colorYellow
 import ru.vi_tour.feature_video.biz.VideoRecordStorageOptions
 import ru.vi_tour.feature_video.biz.VideoRecorder
 import ru.vi_tour.feature_video.biz.name
@@ -58,27 +65,27 @@ internal fun VideoCamera(
     modifier: Modifier = Modifier,
     storageOptions: VideoRecordStorageOptions = VideoRecordStorageOptions.getDefault(LocalContext.current),
     availableQualities: Array<Quality> = VideoRecorder.QUALITIES,
+    availableLenses: Array<Int> = VideoRecorder.LENSES,
     onSuccess: (Uri) -> Unit = {},
     onError: (e: Throwable?) -> Unit = {}
 ) {
 
     var progress by remember { mutableStateOf("") }
 
-    //TODO implement rotation line
-    val rotationController = rememberRotationController()
-
     val videoRecorder = rememberVideoRecorder(
         storageOptions = storageOptions,
         onProgress = remember{{ timeStr, _ ->
             progress = timeStr
         }},
-        onSuccess = onSuccess,
-        onError = onError
+        onSuccess = remember {{ uri ->
+            progress = ""
+            onSuccess(uri)
+        }},
+        onError = remember{{ ex ->
+            progress = ""
+            onError(ex)
+        }}
     )
-
-    var quality by remember(availableQualities) {
-        mutableStateOf(availableQualities.lastOrNull() ?: Quality.FHD)
-    }
 
     val isRecording = videoRecorder.isRecordingFlow.collectAsState(initial = false)
 
@@ -94,6 +101,8 @@ internal fun VideoCamera(
     ) {
         VideoCameraPreview(
             modifier = Modifier.fillMaxSize(),
+            quality = videoRecorder.quality,
+            lensFacing = videoRecorder.lens,
             controller = videoRecorder.controller
         )
         Header(
@@ -101,15 +110,18 @@ internal fun VideoCamera(
             isRecording = isRecording.value,
             progress = progress,
             availableQualities = availableQualities,
-            quality = quality,
-            onQualityChosen = remember {{ quality = it }}
+            availableLenses = availableLenses,
+            quality = videoRecorder.quality,
+            lens = videoRecorder.lens,
+            onQualityChosen = videoRecorder::setNewQuality,
+            onLensChosen = videoRecorder::setNewLens,
         )
         Footer(
             modifier = Modifier.fillMaxWidth(),
             videoRecorder = videoRecorder,
-            quality = quality,
             isRecording = isRecording.value
         )
+        HorizonLevel()
     }
 }
 
@@ -117,9 +129,24 @@ internal fun VideoCamera(
 @Composable
 internal fun VideoCameraPreview(
     controller: LifecycleCameraController,
+    quality: Quality,
+    lensFacing: Int,
     modifier: Modifier = Modifier
 ) {
     val lifecycleOwner = LocalLifecycleOwner.current
+    val context = LocalContext.current
+
+    //TODO recording stops due to changing of lensFacing and quality
+    val previewView = remember(controller, quality, lensFacing) {
+        PreviewView(context).apply {
+            this.controller = controller
+        }
+    }
+
+    LaunchedEffect(key1 = controller, key2 = quality, key3 = lensFacing) {
+        controller.unbind()
+        controller.bindToLifecycle(lifecycleOwner)
+    }
 
     DisposableEffect(key1 = Unit) {
         onDispose {
@@ -129,10 +156,7 @@ internal fun VideoCameraPreview(
 
     AndroidView(
         factory = {
-            PreviewView(it).apply {
-                this.controller = controller
-                controller.bindToLifecycle(lifecycleOwner)
-            }
+            previewView
         },
         modifier = modifier
     )
@@ -144,8 +168,11 @@ private fun BoxScope.Header(
     isRecording: Boolean,
     progress: String,
     availableQualities: Array<Quality>,
+    availableLenses: Array<Int>,
     quality: Quality,
-    onQualityChosen: (Quality) -> Unit
+    lens: Int,
+    onQualityChosen: (Quality) -> Unit,
+    onLensChosen: (Int) -> Unit
 ) {
     Row(
         modifier = modifier
@@ -158,18 +185,31 @@ private fun BoxScope.Header(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceEvenly
     ) {
-        Box(modifier = Modifier.weight(1f))
+        if (availableLenses.size > 1) {
+            LensBlock(
+                modifier = Modifier.weight(1f),
+                lenses = availableLenses,
+                currentLens = lens,
+                onLensChosen = onLensChosen
+            )
+        } else {
+            Box(modifier = Modifier.weight(1f))
+        }
         ProgressBlock(
             modifier = Modifier.weight(1f),
             isRecording = isRecording,
             progress = progress
         )
-        QualityBlock(
-            modifier = Modifier.weight(1f),
-            availableQualities = availableQualities,
-            currentQuality = quality,
-            onQualityChosen = onQualityChosen
-        )
+        if (availableQualities.size > 1) {
+            QualityBlock(
+                modifier = Modifier.weight(1f),
+                availableQualities = availableQualities,
+                currentQuality = quality,
+                onQualityChosen = onQualityChosen
+            )
+        } else {
+            Box(modifier = Modifier.weight(1f))
+        }
     }
 }
 
@@ -177,7 +217,6 @@ private fun BoxScope.Header(
 private fun BoxScope.Footer(
     modifier: Modifier = Modifier,
     videoRecorder: VideoRecorder,
-    quality: Quality,
     isRecording: Boolean
 ) {
     Row(
@@ -193,11 +232,7 @@ private fun BoxScope.Footer(
                 .size(60.dp)
                 .clip(CircleShape)
                 .background(Color.White)
-                .clickable(
-                    onClick = remember(videoRecorder) {{
-                        videoRecorder.recordVideo(quality)
-                    }}
-                ),
+                .clickable(onClick = videoRecorder::recordVideo),
             contentAlignment = Alignment.Center
         ) {
             val size by animateDpAsState(
@@ -299,4 +334,81 @@ private fun QualityBlock(
             }
         }
     }
+}
+
+@OptIn(ExperimentalMaterialApi::class)
+@Composable
+private fun LensBlock(
+    modifier: Modifier = Modifier,
+    lenses: Array<Int>,
+    currentLens: Int,
+    onLensChosen: (Int) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    ExposedDropdownMenuBox(
+        modifier = modifier.width(100.dp),
+        expanded = expanded,
+        onExpandedChange = remember {{ expanded = !expanded }}
+    ) {
+        Text(
+            modifier = Modifier.fillMaxWidth(),
+            text = currentLens.name(),
+            color = Color.White,
+            style = MaterialTheme.typography.body1,
+            textAlign = TextAlign.Center
+        )
+        ExposedDropdownMenu(
+            modifier = Modifier
+                .width(100.dp)
+                .background(Color.Black),
+            expanded = expanded,
+            onDismissRequest = {
+                expanded = false
+            }
+        ) {
+            lenses.forEach { selectionOption ->
+                DropdownMenuItem(
+                    onClick = remember {{
+                        onLensChosen(selectionOption)
+                        expanded = false
+                    }}
+                ){
+                    Text(
+                        modifier = Modifier
+                            .padding(5.dp)
+                            .fillMaxWidth(),
+                        text = selectionOption.name(),
+                        style = MaterialTheme.typography.body1,
+                        color = Color.White,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BoxScope.HorizonLevel() {
+
+    val rotationController = rememberRotationController()
+
+    Box(
+        modifier = Modifier
+            .align(Alignment.Center)
+            .fillMaxWidth()
+            .height(2.dp)
+            .padding(horizontal = 10.dp)
+            .background(colorGreen.copy(alpha = 0.7f))
+    )
+
+    Box(
+        modifier = Modifier
+            .align(Alignment.Center)
+            .fillMaxWidth()
+            .height(2.dp)
+            .padding(horizontal = 10.dp)
+            .rotate(rotationController.roll)
+            .background(colorYellow)
+    )
 }

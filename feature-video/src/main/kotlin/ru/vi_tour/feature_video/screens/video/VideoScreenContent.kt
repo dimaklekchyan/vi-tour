@@ -1,7 +1,10 @@
 package ru.vi_tour.feature_video.screens.video
 
 import android.annotation.SuppressLint
+import android.util.Log
 import android.widget.Toast
+import androidx.camera.core.CameraSelector
+import androidx.camera.video.Quality
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -97,12 +100,15 @@ internal fun VideoScreenContent(vm: VideoScreenViewModel) {
                 storageOptions = VideoRecordStorageOptions
                     .getDefault(context)
                     .copy(storage = VideoRecordStorageOptions.Storage.External),
+                availableQualities = arrayOf(Quality.HIGHEST),
+                availableLenses = arrayOf(CameraSelector.LENS_FACING_BACK),
                 onSuccess = remember {{ uri ->
                     VideoStorage.getVideoByUri(uri, context)?.let { video ->
                         vm.obtainEvent(VideoScreenEvent.VideoRecorder(video))
                     }
                 }},
                 onError = {
+                    Log.d("TAG2", "error: ${it?.cause} ${it?.message}")
                     Toast.makeText(context, "Произошла ошибка", Toast.LENGTH_SHORT).show()
                 }
             )
