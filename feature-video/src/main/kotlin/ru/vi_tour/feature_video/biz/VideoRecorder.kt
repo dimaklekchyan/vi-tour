@@ -97,6 +97,7 @@ class VideoRecorder(
     fun stop() {
         recording?.stop()
         recording = null
+        _isRecordingFlow.tryEmit(false)
     }
 
     fun setNewQuality(quality: Quality) {
@@ -124,7 +125,7 @@ class VideoRecorder(
             VideoRecordStorageOptions.Storage.Internal -> {
                 recording = controller.startRecording(
                     getInternalOutputOptions(storageOptions),
-                    AudioConfig.create(true),
+                    AudioConfig.create(false),
                     ContextCompat.getMainExecutor(context)
                 ) { event ->
                     onEvent(event)
@@ -133,7 +134,7 @@ class VideoRecorder(
             VideoRecordStorageOptions.Storage.External -> {
                 recording = controller.startRecording(
                     getExternalOutputOptions(storageOptions),
-                    AudioConfig.create(true),
+                    AudioConfig.create(false),
                     ContextCompat.getMainExecutor(context)
                 ) { event ->
                     onEvent(event)
@@ -196,10 +197,7 @@ class VideoRecorder(
     }
 
     companion object {
-        val PERMISSIONS = arrayOf(
-            Manifest.permission.CAMERA,
-            Manifest.permission.RECORD_AUDIO,
-        )
+        val PERMISSION = Manifest.permission.CAMERA
 
         const val PERMISSIONS_KEY = "camera_permissions"
 

@@ -8,7 +8,7 @@ import cafe.adriel.voyager.core.registry.rememberScreen
 import cafe.adriel.voyager.navigator.Navigator
 import cafe.adriel.voyager.transitions.SlideTransition
 import dagger.hilt.android.AndroidEntryPoint
-import ru.vi_tour.core_navigation.StartNavSharing
+import ru.vi_tour.core_navigation.VideoNavSharing
 import ru.vi_tour.design_system.theme.AppTheme
 
 @AndroidEntryPoint
@@ -19,7 +19,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             AppTheme {
-                val splashScreen = rememberScreen(StartNavSharing.SplashScreen)
+                val splashScreen = rememberScreen(VideoNavSharing.VideoGraph)
                 Navigator(screen = splashScreen) {
                     SlideTransition(navigator = it)
                 }

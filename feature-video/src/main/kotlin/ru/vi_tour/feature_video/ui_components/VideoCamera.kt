@@ -2,11 +2,16 @@ package ru.vi_tour.feature_video.ui_components
 
 import android.Manifest
 import android.net.Uri
+import android.util.Log
 import androidx.annotation.RequiresPermission
 import androidx.camera.video.Quality
 import androidx.camera.view.LifecycleCameraController
 import androidx.camera.view.PreviewView
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -14,6 +19,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -42,13 +48,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import kotlinx.coroutines.delay
 import ru.vi_tour.design_system.theme.colorBlack
 import ru.vi_tour.design_system.theme.colorGreen
 import ru.vi_tour.design_system.theme.colorRed
@@ -58,6 +65,7 @@ import ru.vi_tour.feature_video.biz.VideoRecorder
 import ru.vi_tour.feature_video.biz.name
 import ru.vi_tour.feature_video.biz.rememberRotationController
 import ru.vi_tour.feature_video.biz.rememberVideoRecorder
+import kotlin.math.abs
 
 @RequiresPermission(allOf = [Manifest.permission.RECORD_AUDIO, Manifest.permission.CAMERA])
 @Composable
@@ -121,7 +129,7 @@ internal fun VideoCamera(
             videoRecorder = videoRecorder,
             isRecording = isRecording.value
         )
-        HorizonLevel()
+        RotationLevel()
     }
 }
 
@@ -389,9 +397,31 @@ private fun LensBlock(
 }
 
 @Composable
-private fun BoxScope.HorizonLevel() {
+private fun BoxScope.RotationLevel() {
 
     val rotationController = rememberRotationController()
+
+    val localDensity = LocalDensity.current
+
+    val rollDeviationColor by animateColorAsState(
+        targetValue = when(abs(rotationController.roll)) {
+            in 0f..20f -> colorGreen
+            in 20f..40f -> colorYellow
+            else -> colorRed
+        },
+        label = "",
+        animationSpec = tween(durationMillis = 500, easing = LinearEasing)
+    )
+
+    val pitchDeviationColor by animateColorAsState(
+        targetValue = when(abs(rotationController.pitch)) {
+            in 0f..20f -> colorGreen
+            in 20f..40f -> colorYellow
+            else -> colorRed
+        },
+        label = "",
+        animationSpec = tween(durationMillis = 500, easing = LinearEasing)
+    )
 
     Box(
         modifier = Modifier
@@ -399,7 +429,7 @@ private fun BoxScope.HorizonLevel() {
             .fillMaxWidth()
             .height(2.dp)
             .padding(horizontal = 10.dp)
-            .background(colorGreen.copy(alpha = 0.7f))
+            .background(colorGreen)
     )
 
     Box(
@@ -409,6 +439,28 @@ private fun BoxScope.HorizonLevel() {
             .height(2.dp)
             .padding(horizontal = 10.dp)
             .rotate(rotationController.roll)
-            .background(colorYellow)
+            .background(rollDeviationColor)
+    )
+
+
+
+    Canvas(
+        modifier = Modifier
+            .align(Alignment.CenterStart)
+            .fillMaxHeight()
+            .padding(start = 10.dp),
+        onDraw = {
+
+            val halfY = size.height / 2
+            val deviationOffset = (halfY / 100) * rotationController.pitch
+            val deviationWidth = with(localDensity) { 2.dp.toPx() }
+
+            drawLine(
+                color = pitchDeviationColor,
+                start = Offset(0f, halfY),
+                end = Offset(0f, halfY + deviationOffset),
+                strokeWidth = deviationWidth
+            )
+        }
     )
 }

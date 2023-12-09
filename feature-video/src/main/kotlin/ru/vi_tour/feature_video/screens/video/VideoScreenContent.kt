@@ -1,6 +1,7 @@
 package ru.vi_tour.feature_video.screens.video
 
 import android.annotation.SuppressLint
+import android.app.Activity
 import android.util.Log
 import android.widget.Toast
 import androidx.camera.core.CameraSelector
@@ -26,6 +27,8 @@ import ru.vi_tour.feature_video.ui_components.VideoCamera
 @Composable
 internal fun VideoScreenContent(vm: VideoScreenViewModel) {
 
+    val context = LocalContext.current
+
     val state = vm.collectState()
 
     TransparentSystemBars(false, false)
@@ -36,7 +39,7 @@ internal fun VideoScreenContent(vm: VideoScreenViewModel) {
 
     val permissionController = rememberPermissionController(
         onGranted = { _, permissions ->
-            if (permissions.containsAll((VideoRecorder.PERMISSIONS + VideoStorage.PERMISSION).toList())) {
+            if (permissions.contains(VideoRecorder.PERMISSION)) {
                 vm.obtainEvent(VideoScreenEvent.PermissionsGranted)
             }
         },
@@ -49,7 +52,7 @@ internal fun VideoScreenContent(vm: VideoScreenViewModel) {
     vm.collectActions { action ->
         when(action) {
             is VideoScreenAction.AskForPermissions -> {
-                permissionController.launchPermission(*(VideoRecorder.PERMISSIONS + VideoStorage.PERMISSION))
+                permissionController.launchPermission(VideoRecorder.PERMISSION)
             }
         }
     }
@@ -66,6 +69,7 @@ internal fun VideoScreenContent(vm: VideoScreenViewModel) {
             }},
             onDismiss = remember(vm) {{
                 vm.obtainEvent(VideoScreenEvent.HidePermissionsRationale)
+                (context as Activity).finish()
             }}
         )
     }
@@ -87,8 +91,6 @@ internal fun VideoScreenContent(vm: VideoScreenViewModel) {
             }}
         )
     }
-
-    val context = LocalContext.current
 
     AppScaffold(
         modifier = Modifier.fillMaxSize(),
