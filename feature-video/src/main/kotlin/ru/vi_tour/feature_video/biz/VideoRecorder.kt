@@ -4,14 +4,14 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.ContentValues
 import android.content.Context
-import android.hardware.Camera
+import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CaptureRequest
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
-import android.util.Log
 import androidx.camera.camera2.impl.Camera2ImplConfig
 import androidx.camera.camera2.internal.Camera2CameraControlImpl
+import androidx.camera.camera2.internal.Camera2CameraInfoImpl
 import androidx.camera.core.CameraSelector
 import androidx.camera.video.FallbackStrategy
 import androidx.camera.video.FileOutputOptions
@@ -89,17 +89,16 @@ class VideoRecorder(
         private set
 
 
+    @SuppressLint("RestrictedApi")
     val controller = LifecycleCameraController(context).apply {
         setEnabledUseCases(CameraController.VIDEO_CAPTURE)
         videoCaptureQualitySelector = QualitySelector.from(
             quality,
             FallbackStrategy.higherQualityOrLowerThan(Quality.FHD)
         )
-        cameraSelector = CameraSelector.Builder()
-            .requireLensFacing(lens)
-            .build()
+        setWideAngleLens()
 
-
+        isPinchToZoomEnabled = false
     }
 
     private val _isRecordingFlow = MutableStateFlow<Boolean>(false)
@@ -124,6 +123,27 @@ class VideoRecorder(
         this.lens = lensFacing
         controller.cameraSelector = CameraSelector.Builder()
             .requireLensFacing(this.lens)
+            .build()
+    }
+
+    @SuppressLint("RestrictedApi")
+    private fun LifecycleCameraController.setWideAngleLens() {
+        cameraSelector = CameraSelector.Builder()
+            .addCameraFilter { cameraInfos ->
+                // filter back cameras with minimum sensor pixel size
+                val backCameras = cameraInfos.filterIsInstance<Camera2CameraInfoImpl>()
+                    .filter {
+                        val pixelWidth = it.cameraCharacteristicsCompat.get(CameraCharacteristics.SENSOR_INFO_PIXEL_ARRAY_SIZE)?.width ?: 0
+                        it.lensFacing == CameraSelector.LENS_FACING_BACK && pixelWidth >= 2000 // arbitrary number resolved empirically
+                    }
+
+                // try to find wide lens camera, if not present, default to general backCameras
+                backCameras.minByOrNull {
+                    val focalLengths = it.cameraCharacteristicsCompat.get(CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS)
+                    focalLengths?.getOrNull(0) ?: 0f
+                }
+                    ?.let { listOf(it) } ?: backCameras
+            }
             .build()
     }
 
@@ -213,15 +233,16 @@ class VideoRecorder(
         return FileOutputOptions.Builder(outputFile).build()
     }
 
+    @SuppressLint("RestrictedApi")
     private fun updateConfig() {
-        controller.cameraInfo?.let {
-            val resolution = QualitySelector.getResolution(it, quality)
+        controller.cameraInfo?.let { info ->
+            val resolution = QualitySelector.getResolution(info, quality)
             config = config.copy(
                 lens = lens.name(),
                 quality = quality.name(),
                 resolutionHeight = resolution?.height ?: 0,
                 resolutionWidth = resolution?.width ?: 0,
-                zoom = it.zoomState.value?.zoomRatio ?: 0f,
+                zoom = info.zoomState.value?.zoomRatio ?: 0f,
             )
         }
     }
@@ -230,19 +251,31 @@ class VideoRecorder(
     private fun turnOnStabilization() {
         val configBuilder = Camera2ImplConfig.Builder()
         configBuilder.setCaptureRequestOption(
-            CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE,
-            CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE_OFF
-        )
-
-        configBuilder.setCaptureRequestOption(
             CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE,
-            CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE_OFF
+            CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE_ON
         )
+        configBuilder.setCaptureRequestOption(
+            CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE,
+            CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE_ON
+        )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            configBuilder.setCaptureRequestOption(
+                CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE,
+                CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE_PREVIEW_STABILIZATION
+            )
+            configBuilder.setCaptureRequestOption(
+                CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE,
+                CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE_PREVIEW_STABILIZATION
+            )
+        }
         (controller.cameraControl as? Camera2CameraControlImpl)?.addInteropConfig(configBuilder.build())
     }
 
     private fun setMinimalZoom() {
+        controller.setLinearZoom(0f)
+        controller.setZoomRatio(0f)
         controller.cameraControl?.setLinearZoom(0f)
+        controller.cameraControl?.setZoomRatio(0f)
     }
 
     companion object {

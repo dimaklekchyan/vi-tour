@@ -154,6 +154,7 @@ internal fun VideoCameraPreview(
     val previewView = remember(controller, quality, lensFacing) {
         PreviewView(context).apply {
             this.controller = controller
+            this.implementationMode = PreviewView.ImplementationMode.PERFORMANCE
         }
     }
 
