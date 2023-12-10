@@ -22,7 +22,9 @@
             android:name="ru.vi_tour.MainActivity"
             android:exported="true"
             android:label="@string/app_name"
-            android:theme="@style/Theme.ViTour">
+            android:theme="@style/Theme.ViTour"
+            android:screenOrientation="portrait"
+            tools:ignore="LockedOrientationActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
